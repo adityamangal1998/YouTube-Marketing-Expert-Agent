@@ -18,7 +18,9 @@ class AIAnalyzer:
         
         if self.aws_access_key and self.aws_secret_key:
             try:
-                self.bedrock_client = boto3.client(
+                # By creating a new session, we avoid loading from the default config file
+                session = boto3.Session()
+                self.bedrock_client = session.client(
                     'bedrock-runtime',
                     aws_access_key_id=self.aws_access_key,
                     aws_secret_access_key=self.aws_secret_key,
@@ -81,6 +83,79 @@ class AIAnalyzer:
         except Exception as e:
             print(f"Error in AI analysis: {e}")
             return self._get_mock_suggestions(video)
+
+    def get_deep_analysis(self, video: Dict) -> Dict:
+        """Generate deep analysis for a video."""
+        if not self.is_configured():
+            return self._get_mock_deep_analysis(video)
+
+        try:
+            video_context = {
+                'title': video.get('title', ''),
+                'description': video.get('description', '')[:1000],
+                'tags': video.get('tags', []),
+                'views': video.get('views', 0),
+                'engagement_rate': video.get('engagement_rate', 0)
+            }
+
+            prompt = f"""
+            Provide a deep, comprehensive analysis of this YouTube video for performance improvement.
+
+            **Video Context:**
+            - **Title:** "{video_context['title']}"
+            - **Description:** "{video_context['description'][:500]}"
+            - **Tags:** {", ".join(video_context['tags'])}
+            - **Views:** {video_context['views']}
+            - **Engagement Rate:** {video_context.get('engagement_rate', 'N/A'):.2f}%
+
+            **Analysis Sections:**
+
+            1.  **Title Analysis**: 
+                - Critique the current title's effectiveness (clarity, SEO, click-through potential).
+                - Provide 3-5 alternative, optimized titles with explanations for why they are better.
+
+            2.  **Description Analysis**:
+                - Critique the current description's structure, SEO, and call-to-actions.
+                - Provide a completely rewritten, optimized description that is ready to be copied and pasted.
+
+            3.  **Tags Analysis**:
+                - Critique the current tags for relevance, mix of broad/specific keywords, and volume.
+                - Provide a list of 15-20 optimized tags.
+
+            4.  **Thumbnail Analysis**: 
+                - Critique the likely thumbnail concept based on the title.
+                - Suggest 3 specific, actionable improvements for the thumbnail design to increase CTR.
+
+            5.  **Content & Pacing**: 
+                - Suggest an improved structure for this type of video (e.g., hook, intro, main points, CTA, outro).
+                - Provide feedback on potential pacing improvements.
+
+            6.  **Audience Persona**: 
+                - Describe the likely target audience for this video and how to better tailor the content for them.
+
+            7.  **Engagement Strategy**: 
+                - Suggest 3 specific hooks or questions to add to the video to increase likes, comments, and shares.
+
+            8.  **Monetization Potential**: 
+                - Provide 2-3 creative ideas for monetizing this specific video's content or audience.
+            
+            9.  **Overall Score & Summary**:
+                - Provide an overall optimization score out of 100.
+                - Summarize the top 3 most critical changes needed to improve performance.
+
+            Format the entire response in Markdown. Use headings for each section.
+            """
+            
+            response = self._call_claude(prompt)
+            
+            if response:
+                return {'deep_analysis': response}
+            else:
+                return self._get_mock_deep_analysis(video)
+
+        except Exception as e:
+            print(f"Error in deep AI analysis: {e}")
+            return self._get_mock_deep_analysis(video)
     
     def _generate_better_title(self, video_context: Dict) -> Optional[str]:
         """Generate a better title using Claude"""
@@ -337,3 +412,39 @@ class AIAnalyzer:
             f"{main_topic} vs alternatives comparison",
             f"Future of {main_topic} in 2025"
         ]
+
+    def _get_mock_deep_analysis(self, video: Dict) -> Dict:
+        """Generate mock deep analysis when AI is not available"""
+        title = video.get('title', 'your video')
+        return {
+            'deep_analysis': f"""
+### 🧠 Deep Analysis & Suggestions for "{title}"
+
+**Thumbnail Analysis**
+1.  **Use High-Contrast Colors**: Make your thumbnail pop with bright, contrasting colors.
+2.  **Include a Human Face**: Thumbnails with expressive faces get more clicks.
+3.  **Add Text Overlay**: Use a short, bold title on the thumbnail itself.
+
+**Content Structure**
+*   **Hook (0-15s)**: Start with a question or a surprising statement.
+*   **Intro (15-30s)**: Briefly explain what the video is about.
+*   **Main Content (30s-end)**: Deliver your main points clearly.
+*   **CTA**: Ask for likes and subscribes around the midpoint.
+*   **Outro**: Tease your next video.
+
+**Audience Persona**
+*   **Who they are**: Likely beginners interested in {self._extract_keywords(title)[0] if self._extract_keywords(title) else 'this topic'}.
+*   **What they want**: Quick, easy-to-understand solutions.
+*   **How to tailor**: Use simple language, avoid jargon.
+
+**Engagement Hooks**
+1.  Ask a question and tell viewers to answer in the comments.
+2.  Run a poll using YouTube's poll card feature.
+3.  Create a "video challenge" related to your content.
+
+**Monetization Potential**
+1.  **Affiliate Marketing**: Link to products you used in the video.
+2.  **Create a Course**: Sell a more in-depth course on the topic.
+3.  **Offer Consulting**: Provide one-on-one help for a fee.
+"""
+        }

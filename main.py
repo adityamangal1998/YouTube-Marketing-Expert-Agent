@@ -67,7 +67,7 @@ def main():
         
         # Analysis options
         st.subheader("Analysis Options")
-        max_videos = st.slider("Max videos to analyze", 5, 50, 20)
+        max_videos = st.slider("Max videos to analyze", 1, 50, 1)
         include_shorts = st.checkbox("Include YouTube Shorts", value=True)
         detailed_analysis = st.checkbox("Detailed AI analysis", value=True)
         use_selenium = st.checkbox("Use advanced scraping (slower)", value=False)
@@ -733,6 +733,21 @@ def display_video_analysis(video: Dict):
             st.markdown("**Content Ideas:**")
             for idea in ai_suggestions['content_ideas']:
                 st.markdown(f"• {idea}")
+
+    # Deep analysis button
+    if st.button("🔬 Get Deep Analysis", key=f"deep_analysis_button_{video['video_id']}"):
+        with st.spinner("🧠 Performing deep analysis..."):
+            ai_analyzer = AIAnalyzer()
+            deep_analysis = ai_analyzer.get_deep_analysis(video)
+            st.session_state[f"deep_analysis_content_{video['video_id']}"] = deep_analysis.get('deep_analysis', 'No analysis available.')
+            # No need to rerun, Streamlit's state management handles the update.
+
+    # Display deep analysis if available
+    if f"deep_analysis_content_{video['video_id']}" in st.session_state:
+        st.markdown("---")
+        st.markdown("### 🧠 Deep Analysis & Suggestions")
+        st.markdown(st.session_state[f"deep_analysis_content_{video['video_id']}"], unsafe_allow_html=True)
+
 
 def export_results(results: Dict, export_json: bool, export_pdf: bool):
     """Export analysis results"""
